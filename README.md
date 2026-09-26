@@ -45,12 +45,14 @@ Copy-Item plugin-web\darkmode\dist\*  <OKAY>\core\data\plugin-ui\darkmode\  -For
 Copy-Item core\data\ui\darkmode.patch  <OKAY>\core\data\ui\darkmode.patch  -Force
 ```
 
-## 首屏引导（可选）
+## 自动应用与首屏引导
 
-插件页面是懒加载的：不配置下面这段，刷新会先以默认主题渲染，直到打开「外观」页才会应用
-保存的主题。
+从 v1.2.0 起，patch 里增加了一条 `target: "bootstrap"` 记录：宿主 WebUI 启动时会 `import`
+`theme.js` 并调用它导出的 `install()`，保存的主题因此在每个页面都自动生效，无需改动
+`index.html`（不支持 `bootstrap` target 的旧宿主会忽略该记录，仍可用下面的内联引导）。
 
-如需首屏即生效，在 `<OKAY>\webui\index.html` 的 `</head>` 之前加入：
+内联引导现在只用于消除首屏闪白：它同步设好 `<html data-theme>`，比宿主 bootstrap 更早。
+在 `<OKAY>\webui\index.html` 的 `</head>` 之前加入：
 
 ```html
 <script>
@@ -127,14 +129,14 @@ plugin-web/darkmode/
   theme.js                            主题引擎（零依赖 IIFE）
   build.mjs                           构建：把两个源文件拷进 dist/
   package.json
-core/data/ui/darkmode.patch           UI patch（路由 + 侧边栏入口），由 pm 随安装自动部署到 CORE_DATA_DIR/ui/
+core/data/ui/darkmode.patch           UI patch（bootstrap 全局引擎 + 路由 + 侧边栏入口），由 pm 随安装自动部署到 CORE_DATA_DIR/ui/
 ```
 
 ### 为什么拆成两个文件
 
 引导脚本可能在宿主 Vue 桥就位之前执行。模块里一旦 `import { h } from 'vue'` 失败，整个模块
-就加载不出来，主题随之失效。所以被引导的 `theme.js` 不含任何依赖（无 import/export，纯 IIFE），
-可以在任意时机安全加载；只有 `index.js` 依赖宿主 Vue。
+就加载不出来，主题随之失效。所以被引导的 `theme.js` 不依赖任何模块（内部是零依赖 IIFE，只在
+末尾 `export` 一个 `install()`），可以在任意时机安全加载；只有 `index.js` 依赖宿主 Vue。
 
 ## 浏览器 API
 

@@ -1,13 +1,17 @@
 // 0KAY dark mode — theme engine.
 //
-// Deliberately dependency-free (no `import`/`export`, wrapped in an IIFE) so it
-// can be loaded three ways and still work:
-//   1. `<script type="module" src="/api/plugins/darkmode/ui/theme.js">` from the
-//      WebUI boot hook — must NOT touch `vue`, it may run before the host bridge
-//      (`window.__0KAY_VUE__`) exists;
-//   2. the appearance page (`index.js`) which imports it for the side effect;
-//   3. a classic `<script>` tag, if a host prefers that.
-// Re-running is harmless — the install path is idempotent.
+// Dependency-free (never touches `vue`, so it may run before the host bridge
+// `window.__0KAY_VUE__` exists). It is loaded three ways and all of them work:
+//   1. the WebUI host as a bootstrap module — darkmode.patch declares a
+//      `target: "bootstrap"` op, so the host imports this file at startup and
+//      calls the exported `install()`. The theme then applies on every page
+//      without editing index.html;
+//   2. the appearance page (`index.js`), which imports this file for its side
+//      effect;
+//   3. an optional inline `<script type="module">` boot hook in index.html to
+//      avoid a first-paint flash (module only: this file uses `export`).
+// Importing runs the engine immediately and re-running is harmless — the
+// install path is idempotent.
 
 ;(function () {
   var STORE_KEY = '0kay_theme_mode'
@@ -273,3 +277,14 @@ html[data-theme="dark"] .emotion-fill{filter:brightness(1.25) saturate(.9)}
     install()
   }
 })()
+
+// Host bootstrap contract (WebUI uiPatches `bootstrap` target): the host imports
+// this module once at startup and calls `install()`. Delegates to the live
+// engine so callers get the same idempotent install path.
+export function install() {
+  if (typeof window !== 'undefined' && window.__0KAY_THEME__) {
+    return window.__0KAY_THEME__.install()
+  }
+}
+
+export default install

@@ -1,10 +1,20 @@
 {
   "id": "darkmode-ui",
   "name": "Dark mode (appearance)",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "plugin": "",
   "enabled": true,
   "patches": [
+    {
+      "target": "bootstrap",
+      "op": "insert",
+      "id": "darkmode-theme",
+      "item": {
+        "id": "darkmode-theme",
+        "plugin": "darkmode",
+        "module": "/api/plugins/darkmode/ui/theme.js?v=2"
+      }
+    },
     {
       "target": "nav",
       "op": "insert",
@@ -26,7 +36,7 @@
         "id": "appearance",
         "path": "/appearance",
         "name": "appearance",
-        "module": "/api/plugins/darkmode/ui/index.js?v=3",
+        "module": "/api/plugins/darkmode/ui/index.js?v=4",
         "title": "外观"
       }
     }
