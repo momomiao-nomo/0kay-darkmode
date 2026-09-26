@@ -6,6 +6,16 @@
   "enabled": true,
   "patches": [
     {
+      "target": "bootstrap",
+      "op": "insert",
+      "id": "darkmode-theme",
+      "item": {
+        "id": "darkmode-theme",
+        "plugin": "darkmode",
+        "module": "/api/plugins/darkmode/ui/theme.js?v=2"
+      }
+    },
+    {
       "target": "nav",
       "op": "insert",
       "anchor": "settings",
