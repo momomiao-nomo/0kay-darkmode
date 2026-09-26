@@ -1,14 +1,14 @@
-「外观」页面和主题引擎。安装、卸载、原理这些写在仓库根目录的 README 里，
-这里只记几个改代码的时候需要注意的点。
+「外观」页面和主题引擎。`index.js` 是页面（原生 Vue ESM，默认导出组件），
+`theme.js` 是主题引擎（零依赖 IIFE）。两个文件本身就能在浏览器里直接跑，所以没有打包步骤——
+`build.mjs` 只是把它们复制到 `dist/`。
 
-- `theme.js` 是主题引擎，**零依赖**——IIFE，没有 import 也没有 export。因为引导脚本
-  可能跑在宿主 Vue 桥（`window.__0KAY_VUE__`）就位之前，这一份要是 import 了 `vue`，
-  导入失败会把整个模块带崩，主题也就装不上了。
-- `index.js` 是「外观」页面，`import './theme.js'` 把引擎带进来，默认导出一个 Vue 组件。
-  它只会被 WebUI 在运行时从 `/api/plugins/darkmode/ui/` 拉走，不经过 Vite。
-- 构建：`npm install && npm run build` → `../../core/data/plugin-ui/darkmode/index.js`。
-  `theme.js` 不进 bundle，改完记得手动抄一份到 `core/data/plugin-ui/darkmode/`。
-- 改了文件就把 `core/data/ui/darkmode.patch` 里 `module` 后面的 `?v=` 加一。
-- 页面样式全在 `.dm-` 命名空间里，卡片那几条得写成 `#app .dm .dm-card`——
-  宿主的 `#app button { … }` 优先级是 (1,0,1)，光写 `.dm-card` 压不住它的 `border-radius`、
-  `transition` 那些。
+- `build.mjs` 用 node 内置 `fs` 复制，不依赖 vite 或 npm install。`index.js` 里的
+  `import { … } from 'vue'` 是运行时由宿主 importmap 映射到宿主桥（`window.__0KAY_VUE__`），
+  构建阶段不需要 vue。
+- 产物 `dist/index.js`、`dist/theme.js` 由 0kay-pm 按根目录 `manifest.json` 的 `ui` 配置
+  发布到 `CORE_DATA_DIR/plugin-ui/darkmode/`，Core 在
+  `/api/plugins/darkmode/ui/{index.js,theme.js}` 提供。
+- 页面样式都在 `.dm-` 命名空间；卡片那种要写成 `#app .dm .dm-card`——宿主的
+  `#app button { … }` 优先级是 (1,0,1)，光写 `.dm-card` 压不住它的 `border-radius`、
+  `transition`。
+- 改了源文件就把仓库里 `core/data/ui/darkmode.patch` 的 router 那条 `?v=` 加一，重新安装（让 pm 重新部署 patch）即可避免浏览器命中旧缓存。
