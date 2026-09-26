@@ -1,38 +1,41 @@
 # 0kay-darkmode
 
-[![0kay-plugin](https://img.shields.io/badge/topic-0kay--plugin-4d5d91)](https://github.com/topics/0kay-plugin)
+给 0KAY WebUI 做的暗夜模式。
 
-0KAY WebUI 的**暗夜模式**插件。不改 0KAY 源码，只靠一份 UI patch + 一个插件原生
-ESM 页面（Scheme C）实现，符合 [0KAY Plugin API](https://razuresoft.github.io/0KAY/PLUGIN_API.html)。
+没改 0KAY 一行源码，就是一份 UI patch 加一个插件自己的页面（官方文档里叫 Scheme C），
+写法和 `plugin-web/skillsguishow` 一个路子。
 
-- 三种模式：**跟随系统 / 浅色 / 深色**，偏好存 `localStorage`
-- `跟随系统` 会实时响应操作系统的深浅色切换
-- 换的是 MD3 token（`--md-*` / `--neutral-gray-*` / `--shadow-*`），不是另写一套样式
-- 顺手修掉 WebUI 里写死的浅色（refined 层灰底、导航/会话栏、Live2D 舞台渐变、`<select>` 箭头、若干容器文字色）
-- 同步设置 `color-scheme`，原生滚动条与表单控件一起变暗
+装完之后左边导航会多一个「外观」，进去选跟随系统 / 浅色 / 深色，选完记在浏览器里。
+选「跟随系统」的话系统切深色它也跟着切，不用手动管。
 
-## 安装
+配色没另起一套，是直接换 MD3 的 token（`--md-*`、`--neutral-gray-*`、`--shadow-*`），
+所以只要宿主还在用这套变量，深浅切换就不会漏掉大片区域。
 
-仓库是一棵**分发树**：目录结构与 0KAY 主仓库一一对应，直接拷贝即可。
+## 装
+
+仓库的目录结构是照着 0KAY 主仓库摆的，所以直接抄过去就行：
 
 ```powershell
 git clone https://github.com/momomiao-nomo/0kay-darkmode.git
 cd 0kay-darkmode
 
-# 假设 0KAY 装在 <OKAY>
+# <OKAY> 换成你本机 0KAY 的目录
 Copy-Item plugin-web\darkmode           <OKAY>\plugin-web\darkmode           -Recurse -Force
 Copy-Item core\data\ui\darkmode.patch   <OKAY>\core\data\ui\darkmode.patch   -Force
 Copy-Item core\data\plugin-ui\darkmode  <OKAY>\core\data\plugin-ui\darkmode  -Recurse -Force
 ```
 
-`core/data/plugin-ui/darkmode/` 里已经带了构建好的 ESM，**不需要 npm 就能用**。
-Core 每 3 秒（有请求时）重扫 `core/data/ui/*.patch`，WebUI 每 15 秒轮询一次，
-所以放好文件后不用重启服务。
+`core/data/plugin-ui/darkmode/` 里放的是构建好的 ESM，机器上没装 node 也能用。
+Core 被人请求 `/api/ui/patches` 时会重扫一遍 patch（3 秒节流），WebUI 那边 15 秒轮询一次，
+所以文件丢进去就生效，不用重启服务。
 
-### 首屏引导（可选，但强烈建议）
+想要更省事的话，其实可以把这三条路径整个覆盖过去——结构是一样的。
 
-插件模块是按需加载的，刷新后要等 `/appearance` 被打开一次才会重新应用。
-让首屏就是深色，在 `<OKAY>/webui/index.html` 的 `</head>` 前加：
+## 想让它开屏就是深色，还得补一段
+
+插件页是**点到才加载**的。不加下面这段的话，刷新会先白/亮一下，非得点进「外观」才变暗。
+
+在 `<OKAY>/webui/index.html` 的 `</head>` 前面插进去：
 
 ```html
 <script>
@@ -54,66 +57,82 @@ Core 每 3 秒（有请求时）重扫 `core/data/ui/*.patch`，WebUI 每 15 秒
 </style>
 ```
 
-⚠️ **不要写成内联 `import('/api/…')`**。Vite 会把 `index.html` 里的内联 module script
-抽成虚拟模块做静态分析，`/api/…` 是运行时地址，会直接报
-`[plugin:vite:import-analysis] Failed to resolve import`。用注入 `<script>` 绕开。
+这段我在你仓库里踩过一次坑，写的时候留意一下：**别写成内联 `import('/api/...')`**。
+Vite 会把 `index.html` 里的内联 module script 抽成虚拟模块做静态分析，`/api/...` 是运行时
+才存在的地址，它当项目文件去找，找不到就直接甩一个
+`[plugin:vite:import-analysis] Failed to resolve import` 出来。用 `createElement` 塞
+`<script>` 标签绕开，Vite 就看不到这条路径了。
 
-同步脚本先把 `data-theme` 定下来（配两条 guard 背景色消除白闪），再异步加载引擎覆盖完整 token 表。
+代码里第一段是同步跑的，先把 `<html data-theme>` 定下来；配上那两条背景色，
+首屏到引擎加载完之前不会闪白。第二段才异步把引擎拉进来补全 token 表。
 
-## 卸载
+## 卸
+
+导航项和路由都是 patch 给的，所以删掉 patch 就全没了：
 
 ```powershell
 Remove-Item <OKAY>\core\data\ui\darkmode.patch
-# 再删掉 index.html 里的引导块；plugin-ui/darkmode/ 留着也不会被加载
+# index.html 里加上去的那段也删掉
 ```
 
-主题偏好存在 `localStorage['0kay_theme_mode']`，清掉即恢复跟随系统。
+`core/data/plugin-ui/darkmode/` 留着无所谓，没 patch 引用它就不会被加载。
+主题偏好存在 `localStorage['0kay_theme_mode']`，清掉就回到跟随系统。
 
-## 构建
+## 改代码
 
-`core/data/plugin-ui/darkmode/` 里的是可直接运行的 ESM（无 SFC、无 JSX）。
-改源码后重新构建：
+`core/data/plugin-ui/darkmode/` 里那份是能直接跑的 ESM，不是压缩产物。改源码之后重新构建：
 
 ```powershell
 cd plugin-web/darkmode
 npm install
-npm run build          # → ../../core/data/plugin-ui/darkmode/index.js
+npm run build          # 输出到 ../../core/data/plugin-ui/darkmode/index.js
 ```
 
-`theme.js` 是纯 IIFE，vite lib 模式不会把它当入口，改完请手动同步一份到
-`core/data/plugin-ui/darkmode/`。改了任一文件记得 bump `core/data/ui/darkmode.patch`
-里 `module` 的 `?v=` 号。
+`theme.js` 是个纯 IIFE，vite 的 lib 模式不会把它当入口打进去，所以改完得手动抄一份到
+`core/data/plugin-ui/darkmode/`。另外改了文件记得把 `core/data/ui/darkmode.patch` 里
+`module` 后面的 `?v=` 往上加一，不然浏览器缓存里面的旧模块不一定换。
 
 ## 目录
 
-```text
-manifest.json                       # 包身份（schema 1）
-plugin-web/darkmode/
-  theme.js                          # 主题引擎：零依赖（无 import/export，IIFE）
-  index.js                          # 外观页：import './theme.js' + 默认导出 Vue 组件
-  package.json / vite.config.js     # 构建约定，与 plugin-web/skillsguishow 一致
-  manifest.json                     # 放进 0KAY 树后由 0kay-pm 读取的模块清单
-  README.md                         # 更详细的设计说明与主题 token 表
-core/data/ui/darkmode.patch         # 导航「外观」+ /appearance 路由
-core/data/plugin-ui/darkmode/       # Core 经 /api/plugins/darkmode/ui/… 提供的产物
+```
+manifest.json                       包身份，给 0kay-pm 看的
+plugin-web/darkmode/                ← 抄到 <OKAY>/plugin-web/darkmode/
+  theme.js                          主题引擎
+  index.js                          「外观」页面
+  package.json, vite.config.js      构建配置，和 skillsguishow 对齐
+  manifest.json                     放进 0KAY 树之后由 0kay-pm 读的那份
+core/data/ui/darkmode.patch         ← 抄到 <OKAY>/core/data/ui/
+core/data/plugin-ui/darkmode/       ← 抄到 <OKAY>/core/data/plugin-ui/
 ```
 
-拆成两个文件是有原因的：引导脚本可能早于宿主 Vue 桥（`window.__0KAY_VUE__`）执行，
-所以被引导的那份**绝不能 import `vue`**。`theme.js` 无任何依赖，任何时机加载都安全；
-`index.js` 才是需要宿主 Vue 的页面。
+### 为什么要拆成两个文件
 
-## 运行时 API
+因为引导脚本可能跑在宿主 Vue 桥（`window.__0KAY_VUE__`）就位之前。
+模块里只要写了 `import { h } from 'vue'`，导入失败整个模块就挂了，主题也就装不上——
+宿主那边会报 `__0KAY_VUE__ is not ready`。
+
+所以被引导的那个 `theme.js` 一点依赖都没有（没有 import/export，纯 IIFE），什么时候加载都安全；
+需要宿主 Vue 的只有 `index.js`，也就是那个页面。
+
+## 在控制台里能用
+
+引擎挂了个 `window.__0KAY_THEME__`：
 
 ```js
 __0KAY_THEME__.getMode()          // 'auto' | 'light' | 'dark'
-__0KAY_THEME__.resolved()         // 'light' | 'dark'（auto 已解析）
-__0KAY_THEME__.setMode('dark')    // 写入偏好并应用
-__0KAY_THEME__.toggle()           // 在浅/深之间切换（会固定为显式模式）
-__0KAY_THEME__.install()          // 幂等重装（应用 + 挂媒体查询监听）
+__0KAY_THEME__.resolved()         // 'light' | 'dark'，auto 已经解析过
+__0KAY_THEME__.setMode('dark')    // 写偏好 + 立刻应用
+__0KAY_THEME__.toggle()           // 浅深互切，会固定成显式模式
+__0KAY_THEME__.install()          // 幂等重装
 ```
 
-## 兼容性
+## 可能出问题的地方
 
-针对 0KAY 的 `refined` 主题层（`--md-primary: #4d5d91`）调色。WebUI 后续改了
-token 或组件类名，深色可能需要跟着补规则；`theme.js` 里所有覆盖都在
-`html[data-theme="dark"]` 下，漏掉的只会是局部样式，不会影响浅色模式。
+覆盖规则全是挂在 `html[data-theme="dark"]` 下面的，所以就算哪天 WebUI 改了类名或者 token，
+最坏也就是局部没跟上，浅色模式不受影响。
+
+调色是照 0KAY 现在那套 `refined` 主题（`--md-primary: #4d5d91`）配的。除了 token，
+还补了几处 WebUI 里写死的浅色：refined 层的 `#f8f9fb` 灰底、导航和会话栏、
+Live2D 舞台的渐变、`<select>` 那个箭头 SVG，以及 AboutPanel/UsagePage 里几个写死的深色文字。
+另外补了 `--md-on-error-container` / `--md-on-success-container` / `--md-on-warning-container`
+这三个宿主没定义的 token，不然深色下那些容器里的文字会跟背景糊在一起。
