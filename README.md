@@ -11,20 +11,21 @@
 
 ## 安装
 
-插件按 0KAY 插件 API（v1）打包，`manifest.json` 用 `ui` 字段声明构建与发布方式。
-只要包名进了 0kay-pm 的包映射，一行即可装好——pm 会自己构建页面、把产物发布到
-`CORE_DATA_DIR/plugin-ui/darkmode/`，并连同 `core/data/ui/darkmode.patch` 一起部署到
-`CORE_DATA_DIR/ui/`（页面路由与侧边栏入口都靠这份 patch，Core 从 `CORE_DATA_DIR/ui/*.patch` 读取）：
+按 0KAY 插件 API（v1）打包。`manifest.json` 用 `ui` 字段声明构建与发布方式，并用 `patches`
+字段声明要随安装一起部署到 `CORE_DATA_DIR/ui/` 的 patch（页面路由与侧边栏入口都靠它，Core 从
+`CORE_DATA_DIR/ui/*.patch` 读取）。
+
+0KAY-pm 支持第三方包：非内置的包名会先查 npm registry 的 `repository` 字段，否则按
+`github.com/<owner>/<repo>` 约定解析。所以这里用跟 GitHub 仓库 owner 一致的
+`@momomiao-nomo/0kay-darkmode`，pm 就能自己找到仓库、构建页面、把产物发布到
+`CORE_DATA_DIR/plugin-ui/darkmode/` 并部署 patch，一行装好：
 
 ```powershell
-0kay-pm install @razuresoft/0kay-darkmode@1.1.0
+0kay-pm install @momomiao-nomo/0kay-darkmode
 ```
 
-装好不用重启：Core 收到 `/api/ui/patches` 请求时会重扫 patch 目录（3 秒节流），WebUI 每 15 秒轮询一次。
-
-> 个别旧版 pm 只发布 `plugin-ui/`、不自动部署 patch。若装完后侧边栏没有「外观」入口，
-> 把仓库里的 `core/data/ui/darkmode.patch` 手动放到 `<OKAY>\core\data\ui\darkmode.patch` 即可
-> （升级 pm 后会自动，无需这步）。
+> 需要支持「第三方包解析 + patch 自动部署」的 0KAY-pm（GitHub `main` 分支 / 后续带该能力的发行版）。
+> 装好不用重启：Core 收到 `/api/ui/patches` 请求时会重扫 patch 目录（3 秒节流），WebUI 每 15 秒轮询一次。
 
 ## 手动安装（仅当 pm 还没收录此包时）
 
