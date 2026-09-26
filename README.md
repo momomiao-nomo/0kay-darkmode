@@ -27,6 +27,8 @@
 > 需要支持「第三方包解析 + patch 自动部署」的 0KAY-pm（GitHub `main` 分支 / 后续带该能力的发行版）。
 > 装好不用重启：Core 收到 `/api/ui/patches` 请求时会重扫 patch 目录（3 秒节流），WebUI 每 15 秒轮询一次。
 
+> 上架插件市场：给 GitHub 仓库 `momomiao-nomo/0kay-darkmode` 加上 **Topics** `0kay-plugin`（仓库 → Settings → Topics）。市场靠这个 topic 发现插件，**不读 manifest** 里的任何字段（manifest 里的 `repository` 只用于市场详情链接和已装列表回显）。
+
 ## 手动安装（仅当 pm 还没收录此包时）
 
 源码本身是可直跑的 ESM，构建只是把两个文件拷进 `dist/`。不走 pm 时，产物和 patch 都要手动放到位：
@@ -45,55 +47,20 @@ Copy-Item plugin-web\darkmode\dist\*  <OKAY>\core\data\plugin-ui\darkmode\  -For
 Copy-Item core\data\ui\darkmode.patch  <OKAY>\core\data\ui\darkmode.patch  -Force
 ```
 
-## 自动应用与首屏引导
+## 自动应用（纯插件，不碰宿主源码）
 
-从 v1.2.0 起，patch 里增加了一条 `target: "bootstrap"` 记录：宿主 WebUI 启动时会 `import`
-`theme.js` 并调用它导出的 `install()`，保存的主题因此在每个页面都自动生效，无需改动
-`index.html`（不支持 `bootstrap` target 的旧宿主会忽略该记录，仍可用下面的内联引导）。
+patch 里有一条 `target: "bootstrap"` 记录：宿主 WebUI 启动时会 `import` `theme.js` 并调用它导出的
+`install()`，保存的主题因此在每个页面都自动生效——**整个过程不改动宿主任何源码**，主题引擎只是往
+`<head>` 注入一段 `<style>` 覆盖 MD3 的 `--md-*` / `--shadow-*` 变量。
 
-内联引导现在只用于消除首屏闪白：它同步设好 `<html data-theme>`，比宿主 bootstrap 更早。
-在 `<OKAY>\webui\index.html` 的 `</head>` 之前加入：
+偏好存在浏览器 `localStorage['0kay_theme_mode']`（按时段模式另有 `0kay_theme_schedule`），
+所以**刷新页面后主题依然在**：每次启动 bootstrap 模块都会重新 `import` 并 `install()`，从 localStorage
+读回模式，`<html data-theme>` 随即恢复，无需手动切回。
 
-```html
-<script>
-  try {
-    var m = localStorage.getItem('0kay_theme_mode') || 'auto';
-    var dark;
-    if (m === 'dark') dark = true;
-    else if (m === 'light') dark = false;
-    else if (m === 'schedule') {
-      var s = null;
-      try { s = JSON.parse(localStorage.getItem('0kay_theme_schedule') || 'null'); } catch (e) {}
-      var from = (s && s.darkFrom) || '19:00';
-      var until = (s && s.darkUntil) || '07:00';
-      var toMin = function (t) { var p = t.split(':'); return (+p[0]) * 60 + (+p[1]); };
-      var now = new Date(), min = now.getHours() * 60 + now.getMinutes();
-      var a = toMin(from), b = toMin(until);
-      dark = a === b ? false : (a < b ? (min >= a && min < b) : (min >= a || min < b));
-    } else {
-      dark = matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  } catch (e) { document.documentElement.dataset.theme = 'light'; }
-  (function () {
-    var s = document.createElement('script');
-    s.type = 'module';
-    s.src = '/api/plugins/darkmode/ui/theme.js';
-    document.head.appendChild(s);
-  })();
-</script>
-<style>
-  html[data-theme="dark"] { color-scheme: dark; background: #14161d; }
-  html[data-theme="dark"] body { background: #14161d; color: #e3e6ee; }
-</style>
-```
-
-提示：不要在 index.html 的内联 module script 里写 `import('/api/...')`。Vite 会把内联脚本
-当项目模块做静态分析，而 `/api/...` 是运行时地址，会报
-`[plugin:vite:import-analysis] Failed to resolve import`。用 `createElement('script')`
-注入可以绕过。
-
-第一段脚本同步执行，先确定 `<html data-theme>` 并用背景色避免首屏闪白；第二段异步加载引擎补 token。
+（可选，非必须）首屏防闪白：纯插件部署下，刷新瞬间可能极短暂地闪一下浅色，再被 bootstrap 切到深色。
+若接受这一点，上面这套就够了。若想彻底无闪白，可手动在 `<OKAY>\webui\index.html` 的 `</head>` 前加一段
+同步设 `data-theme` 的内联脚本（只设背景色、不 load 引擎）——但这属于安装时的手动步骤，**不在插件包内**，
+纯插件方案可以不做。
 
 ## 卸载
 
