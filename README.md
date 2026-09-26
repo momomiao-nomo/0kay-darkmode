@@ -3,8 +3,9 @@
 0KAY WebUI 的暗夜模式插件。不改 0KAY 源码，通过一份 UI patch 加一个插件页面实现
 （插件侧叫 Scheme C，和 `plugin-web/skillsguishow` 同一种写法）。
 
-提供三种模式：跟随系统 / 浅色 / 深色，偏好保存在浏览器 `localStorage`。
-选择「跟随系统」时，会随操作系统的深浅色设置自动切换。
+提供四种模式：跟随系统 / 浅色 / 深色 / 按时段，偏好保存在浏览器 `localStorage`。
+「跟随系统」随操作系统的深浅色设置切换；「按时段」在指定的时间段内自动切换，默认
+深色时段为 19:00–07:00，可在外观页改。
 
 实现上没有另写一套样式，而是覆盖 MD3 的 CSS 变量（`--md-*`、`--neutral-gray-*`、
 `--shadow-*`），因此宿主只要继续使用这些变量，切换主题就不会出现大面积漏改。
@@ -38,7 +39,21 @@ Core 在收到 `/api/ui/patches` 请求时会重扫 patch 目录（3 秒节流�
 <script>
   try {
     var m = localStorage.getItem('0kay_theme_mode') || 'auto';
-    var dark = m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    var dark;
+    if (m === 'dark') dark = true;
+    else if (m === 'light') dark = false;
+    else if (m === 'schedule') {
+      var s = null;
+      try { s = JSON.parse(localStorage.getItem('0kay_theme_schedule') || 'null'); } catch (e) {}
+      var from = (s && s.darkFrom) || '19:00';
+      var until = (s && s.darkUntil) || '07:00';
+      var toMin = function (t) { var p = t.split(':'); return (+p[0]) * 60 + (+p[1]); };
+      var now = new Date(), min = now.getHours() * 60 + now.getMinutes();
+      var a = toMin(from), b = toMin(until);
+      dark = a === b ? false : (a < b ? (min >= a && min < b) : (min >= a || min < b));
+    } else {
+      dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    }
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   } catch (e) { document.documentElement.dataset.theme = 'light'; }
   (function () {
@@ -114,10 +129,12 @@ core/data/plugin-ui/darkmode/       Core 通过 /api/plugins/darkmode/ui/ 提供
 引擎会挂载 `window.__0KAY_THEME__`：
 
 ```js
-__0KAY_THEME__.getMode()          // 'auto' | 'light' | 'dark'
-__0KAY_THEME__.resolved()         // 'light' | 'dark'（auto 已解析）
+__0KAY_THEME__.getMode()          // 'auto' | 'light' | 'dark' | 'schedule'
+__0KAY_THEME__.resolved()         // 'light' | 'dark'（auto / schedule 已解析）
 __0KAY_THEME__.setMode('dark')    // 写入偏好并应用
 __0KAY_THEME__.toggle()           // 浅色/深色切换
+__0KAY_THEME__.getSchedule()      // { darkFrom: '19:00', darkUntil: '07:00' }
+__0KAY_THEME__.setSchedule({ darkFrom: '20:00', darkUntil: '06:30' })
 __0KAY_THEME__.install()          // 幂等重装
 ```
 

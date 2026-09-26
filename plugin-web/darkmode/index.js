@@ -55,6 +55,14 @@ const CSS = `
   background:var(--md-surface-container);color:var(--md-on-surface-variant);
 }
 .dm-note b{color:var(--md-on-surface)}
+
+.dm-times{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:14px}
+.dm-time{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--md-on-surface-variant)}
+.dm-time input{
+  min-height:44px;padding:8px 12px;border-radius:12px;
+  border:1px solid var(--md-outline-variant);background:var(--md-surface-container);
+  color:var(--md-on-surface);font:inherit;
+}
 `
 
 const STYLE_ID = '0kay-darkmode-page-style'
@@ -81,6 +89,10 @@ const LABELS = {
     lightDesc: '默认的明亮主题',
     dark: '深色',
     darkDesc: '夜间与弱光环境下更省眼',
+    schedule: '按时段',
+    scheduleDesc: '到点自动切换深浅色',
+    darkFrom: '深色开始',
+    darkUntil: '深色结束',
     current: '当前生效：',
     note: '外观偏好保存在本机浏览器（localStorage），不会上传到服务端。删掉 core/data/ui/darkmode.patch 即恢复默认浅色。',
     on: '✓',
@@ -95,6 +107,10 @@ const LABELS = {
     lightDesc: 'The default bright theme',
     dark: 'Dark',
     darkDesc: 'Easier on the eyes at night',
+    schedule: 'Schedule',
+    scheduleDesc: 'Switch automatically at set times',
+    darkFrom: 'Dark from',
+    darkUntil: 'Dark until',
     current: 'Active now: ',
     note: 'The preference is stored in this browser (localStorage) and never sent to the server. Remove core/data/ui/darkmode.patch to go back to light.',
     on: '✓',
@@ -109,6 +125,10 @@ const LABELS = {
     lightDesc: '既定の明るいテーマ',
     dark: 'ダーク',
     darkDesc: '夜間でも目に優しい表示',
+    schedule: '時間帯',
+    scheduleDesc: '設定した時刻で自動切替',
+    darkFrom: 'ダーク開始',
+    darkUntil: 'ダーク終了',
     current: '現在の適用: ',
     note: '設定はこのブラウザ（localStorage）に保存され、サーバーへ送信されません。core/data/ui/darkmode.patch を削除すると既定のライトに戻ります。',
     on: '✓',
@@ -130,6 +150,7 @@ const SWATCH = {
   auto: ['#f8f9fb', '#1e212a'],
   light: ['#ffffff', '#f1f3f6', '#e8ecf7'],
   dark: ['#14161d', '#282c36', '#2c3760'],
+  schedule: ['#f8f9fb', '#2c3760', '#14161d'],
 }
 
 export default {
@@ -141,10 +162,21 @@ export default {
     const theme = (typeof window !== 'undefined' && window.__0KAY_THEME__) || null
     const mode = ref(theme ? theme.getMode() : 'auto')
     const active = ref(theme ? theme.resolved() : 'light')
+    const sched = ref(theme && theme.getSchedule ? theme.getSchedule() : { darkFrom: '19:00', darkUntil: '07:00' })
 
     function choose(next) {
       mode.value = next
       active.value = theme ? theme.setMode(next) : next
+      if (next === 'schedule' && theme && theme.setSchedule) {
+        theme.setSchedule({ darkFrom: sched.value.darkFrom, darkUntil: sched.value.darkUntil })
+        active.value = theme.resolved()
+      }
+    }
+
+    function onScheduleChange() {
+      if (!theme || !theme.setSchedule) return
+      theme.setSchedule({ darkFrom: sched.value.darkFrom, darkUntil: sched.value.darkUntil })
+      active.value = theme.resolved()
     }
 
     const onSystemChange = () => {
@@ -168,6 +200,7 @@ export default {
       { id: 'auto', title: t.auto, desc: t.autoDesc },
       { id: 'light', title: t.light, desc: t.lightDesc },
       { id: 'dark', title: t.dark, desc: t.darkDesc },
+      { id: 'schedule', title: t.schedule, desc: t.scheduleDesc },
     ])
 
     return () =>
@@ -195,11 +228,32 @@ export default {
           ]),
         )),
 
+        mode.value === 'schedule'
+          ? h('div', { class: 'dm-times' }, [
+              h('label', { class: 'dm-time' }, [
+                h('span', {}, t.darkFrom),
+                h('input', {
+                  type: 'time',
+                  value: sched.value.darkFrom,
+                  onInput: (e) => { sched.value.darkFrom = e.target.value; onScheduleChange() },
+                }),
+              ]),
+              h('label', { class: 'dm-time' }, [
+                h('span', {}, t.darkUntil),
+                h('input', {
+                  type: 'time',
+                  value: sched.value.darkUntil,
+                  onInput: (e) => { sched.value.darkUntil = e.target.value; onScheduleChange() },
+                }),
+              ]),
+            ])
+          : null,
+
         h('p', { class: 'dm-note' }, [
           h('b', {}, t.current),
           active.value === 'dark' ? t.dark : t.light,
           ' · ',
-          mode.value === 'auto' ? t.auto : '—',
+          mode.value === 'auto' ? t.auto : (mode.value === 'schedule' ? t.schedule : '—'),
         ]),
         h('p', { class: 'dm-note' }, t.note),
       ])

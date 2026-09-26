@@ -11,8 +11,10 @@
 
 ;(function () {
   var STORE_KEY = '0kay_theme_mode'
+  var SCHEDULE_KEY = '0kay_theme_schedule'
   var STYLE_ID = '0kay-darkmode-style'
-  var MODES = ['auto', 'light', 'dark']
+  var MODES = ['auto', 'light', 'dark', 'schedule']
+  var DEFAULT_SCHEDULE = { darkFrom: '19:00', darkUntil: '07:00' }
 
   var DARK_CSS = `
 /* ============ 0KAY dark theme (plugin: darkmode) ============ */
@@ -154,9 +156,49 @@ html[data-theme="dark"] .emotion-fill{filter:brightness(1.25) saturate(.9)}
     try { localStorage.setItem(STORE_KEY, mode) } catch (e) { /* ignore */ }
   }
 
-  /** Resolve "auto" against the OS preference. */
+  function readSchedule() {
+    try {
+      var raw = localStorage.getItem(SCHEDULE_KEY)
+      if (raw) {
+        var s = JSON.parse(raw)
+        if (s && typeof s.darkFrom === 'string' && typeof s.darkUntil === 'string') {
+          return { darkFrom: s.darkFrom, darkUntil: s.darkUntil }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return { darkFrom: DEFAULT_SCHEDULE.darkFrom, darkUntil: DEFAULT_SCHEDULE.darkUntil }
+  }
+
+  function writeSchedule(schedule) {
+    try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule)) } catch (e) { /* ignore */ }
+  }
+
+  /** "HH:MM" -> minutes since midnight. */
+  function toMinutes(hhmm) {
+    var p = String(hhmm || '').split(':')
+    var h = parseInt(p[0], 10)
+    var m = parseInt(p[1], 10)
+    if (isNaN(h) || isNaN(m)) return NaN
+    return h * 60 + m
+  }
+
+  /** Whether the current local time falls inside the scheduled dark window. */
+  function scheduleDark(schedule) {
+    var from = toMinutes(schedule.darkFrom)
+    var until = toMinutes(schedule.darkUntil)
+    if (isNaN(from) || isNaN(until)) return false
+    var now = new Date()
+    var minutes = now.getHours() * 60 + now.getMinutes()
+    if (from === until) return false
+    if (from < until) return minutes >= from && minutes < until
+    return minutes >= from || minutes < until // wraps past midnight
+  }
+
+  /** Resolve a mode to the concrete "light" | "dark" value. */
   function resolve(mode) {
-    return mode === 'auto' ? (systemDark() ? 'dark' : 'light') : mode
+    if (mode === 'auto') return systemDark() ? 'dark' : 'light'
+    if (mode === 'schedule') return scheduleDark(readSchedule()) ? 'dark' : 'light'
+    return mode
   }
 
   /** Install the sheet once; it only activates under [data-theme="dark"]. */
@@ -191,10 +233,17 @@ html[data-theme="dark"] .emotion-fill{filter:brightness(1.25) saturate(.9)}
     else if (typeof m.addListener === 'function') m.addListener(onChange)
   }
 
-  /** Idempotent: apply the saved mode and follow the OS when mode is "auto". */
+  var scheduleTimer = null
+  function tick() {
+    // Re-evaluate so a "schedule" mode flips at the boundary without a reload.
+    if (readMode() === 'schedule') apply('schedule')
+  }
+
+  /** Idempotent: apply the saved mode and follow OS / schedule automatically. */
   function install() {
     apply(readMode())
     listen()
+    if (!scheduleTimer) scheduleTimer = setInterval(tick, 30000)
   }
 
   var api = {
@@ -207,6 +256,13 @@ html[data-theme="dark"] .emotion-fill{filter:brightness(1.25) saturate(.9)}
     },
     toggle: function () {
       return api.setMode(resolve(readMode()) === 'dark' ? 'light' : 'dark')
+    },
+    getSchedule: readSchedule,
+    setSchedule: function (schedule) {
+      var from = schedule && schedule.darkFrom ? schedule.darkFrom : DEFAULT_SCHEDULE.darkFrom
+      var until = schedule && schedule.darkUntil ? schedule.darkUntil : DEFAULT_SCHEDULE.darkUntil
+      writeSchedule({ darkFrom: from, darkUntil: until })
+      if (readMode() === 'schedule') apply('schedule')
     },
     apply: apply,
     install: install,
