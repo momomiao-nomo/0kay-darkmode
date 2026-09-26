@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "name": "@momomiao-nomo/0kay-darkmode",
-  "version": "1.3.0",
-  "description": "Dark mode / 暗夜模式 for the 0KAY WebUI: UI patch + native ESM appearance page.",
+  "version": "1.4.0",
+  "description": "Dark mode / 暗夜模式 for the 0KAY WebUI: gradient theme transition + native ESM appearance pane registered in Settings.",
   "repository": "https://github.com/momomiao-nomo/0kay-darkmode",
   "patches": ["core/data/ui/darkmode.patch"],
   "ui": {

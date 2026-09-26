@@ -11,4 +11,5 @@
 - 页面样式都在 `.dm-` 命名空间；卡片那种要写成 `#app .dm .dm-card`——宿主的
   `#app button { … }` 优先级是 (1,0,1)，光写 `.dm-card` 压不住它的 `border-radius`、
   `transition`。
-- 改了源文件就把仓库里 `core/data/ui/darkmode.patch` 的 router 那条 `?v=` 加一，重新安装（让 pm 重新部署 patch）即可避免浏览器命中旧缓存。
+- `index.js` 现在由 `core/data/ui/darkmode.patch` 的 **settings** 那条以 `module` 形式内嵌到「设置 → 外观」，不再注册侧边栏与 `/appearance` 路由。宿主只挂载默认导出组件，不会自带保存按钮。
+- 改了源文件就把仓库里 `core/data/ui/darkmode.patch` 的 `?v=` 加一（settings 的 `index.js`、bootstrap 的 `theme.js` 两条各自维护），重新安装（让 pm 重新部署 patch）即可避免浏览器命中旧缓存。

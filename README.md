@@ -1,10 +1,14 @@
 # 0kay-darkmode
 
-0KAY WebUI 的暗夜模式插件。不改 0KAY 源码，通过一份 UI patch 加一个原生 ESM 页面实现。
+0KAY WebUI 的暗夜模式插件。不改 0KAY 源码，通过一份 UI patch 加一个原生 ESM 面板实现。
+
+外观面板内嵌在 **设置 → 外观**（`settings` op 的 `module`），不再注册侧边栏入口与
+`/appearance` 路由。切换深浅色时整页颜色做 560ms 的渐变过渡，并叠一层目标主题色的
+径向渐变洗屏，避免硬切闪变（尊重 `prefers-reduced-motion`）。
 
 提供四种模式：跟随系统 / 浅色 / 深色 / 按时段，偏好保存在浏览器 `localStorage`。
 「跟随系统」随操作系统的深浅色设置切换；「按时段」在指定时间段内自动切换，默认深色时段
-19:00–07:00，可在外观页改。
+19:00–07:00，可在设置里改。
 
 实现上没有另写一套样式，而是覆盖 MD3 的 CSS 变量（`--md-*`、`--neutral-gray-*`、`--shadow-*`），
 所以宿主只要继续用这些变量，切主题就不会大面积漏改。
@@ -12,8 +16,8 @@
 ## 安装
 
 按 0KAY 插件 API（v1）打包。`manifest.json` 用 `ui` 字段声明构建与发布方式，并用 `patches`
-字段声明要随安装一起部署到 `CORE_DATA_DIR/ui/` 的 patch（页面路由与侧边栏入口都靠它，Core 从
-`CORE_DATA_DIR/ui/*.patch` 读取）。
+字段声明要随安装一起部署到 `CORE_DATA_DIR/ui/` 的 patch（设置里的外观入口与全局主题引擎都靠它，
+Core 从 `CORE_DATA_DIR/ui/*.patch` 读取）。
 
 0KAY-pm 支持第三方包：非内置的包名会先查 npm registry 的 `repository` 字段，否则按
 `github.com/<owner>/<repo>` 约定解析。所以这里用跟 GitHub 仓库 owner 一致的
@@ -51,7 +55,8 @@ Copy-Item core\data\ui\darkmode.patch  <OKAY>\core\data\ui\darkmode.patch  -Forc
 
 patch 里有一条 `target: "bootstrap"` 记录：宿主 WebUI 启动时会 `import` `theme.js` 并调用它导出的
 `install()`，保存的主题因此在每个页面都自动生效——**整个过程不改动宿主任何源码**，主题引擎只是往
-`<head>` 注入一段 `<style>` 覆盖 MD3 的 `--md-*` / `--shadow-*` 变量。
+`<head>` 注入一段 `<style>` 覆盖 MD3 的 `--md-*` / `--shadow-*` 变量，并在切换时短暂加上
+`html.0kay-theme-fade`（颜色过渡）与一个 `#0kay-theme-wipe` 径向渐变层。
 
 偏好存在浏览器 `localStorage['0kay_theme_mode']`（按时段模式另有 `0kay_theme_schedule`），
 所以**刷新页面后主题依然在**：每次启动 bootstrap 模块都会重新 `import` 并 `install()`，从 localStorage
@@ -68,8 +73,8 @@ patch 里有一条 `target: "bootstrap"` 记录：宿主 WebUI 启动时会 `imp
 Remove-Item <OKAY>\core\data\ui\darkmode.patch
 ```
 
-导航项和路由都由 patch 提供，删掉即消失。`core/data/plugin-ui/darkmode/` 可以保留，没有
-patch 引用就不会被加载。主题偏好在 `localStorage['0kay_theme_mode']`，清除后回到跟随系统。
+设置里的外观入口与全局主题引擎都由 patch 提供，删掉即消失。`core/data/plugin-ui/darkmode/` 可以
+保留，没有 patch 引用就不会被加载。主题偏好在 `localStorage['0kay_theme_mode']`，清除后回到跟随系统。
 
 ## 构建
 
@@ -85,18 +90,19 @@ node build.mjs        # 输出 dist/index.js、dist/theme.js
 importmap 在运行时映射到宿主桥（`window.__0KAY_VUE__`），打包阶段不依赖它。
 
 改完源码后，`pm install`（或上面的手动步骤）会重新构建 `dist/` 并发布。若浏览器命中旧缓存，
-把 `core/data/ui/darkmode.patch` 里 router 那条的 `?v=` 加一即可。
+把 `core/data/ui/darkmode.patch` 里 settings 的 `index.js`（或 bootstrap 的 `theme.js`）那条的
+`?v=` 加一即可。
 
 ## 目录
 
 ```text
 manifest.json                         包身份 + ui 构建/发布配置（0kay-pm 读取）
 plugin-web/darkmode/
-  index.js                            外观页（原生 Vue ESM，默认导出组件）
-  theme.js                            主题引擎（零依赖 IIFE）
+  index.js                            外观面板（原生 Vue ESM，默认导出组件，内嵌到设置）
+  theme.js                            主题引擎 + 渐变过渡（零依赖 IIFE）
   build.mjs                           构建：把两个源文件拷进 dist/
   package.json
-core/data/ui/darkmode.patch           UI patch（bootstrap 全局引擎 + 路由 + 侧边栏入口），由 pm 随安装自动部署到 CORE_DATA_DIR/ui/
+core/data/ui/darkmode.patch           UI patch（bootstrap 全局引擎 + settings 外观面板），由 pm 随安装自动部署到 CORE_DATA_DIR/ui/
 ```
 
 ### 为什么拆成两个文件
