@@ -1,0 +1,34 @@
+{
+  "id": "darkmode-ui",
+  "name": "Dark mode (appearance)",
+  "version": "0.1.0",
+  "plugin": "",
+  "enabled": true,
+  "patches": [
+    {
+      "target": "nav",
+      "op": "insert",
+      "anchor": "settings",
+      "position": "before",
+      "id": "appearance",
+      "item": {
+        "id": "appearance",
+        "to": "/appearance",
+        "label": "外观",
+        "order": 95
+      }
+    },
+    {
+      "target": "router",
+      "op": "insert",
+      "id": "appearance",
+      "item": {
+        "id": "appearance",
+        "path": "/appearance",
+        "name": "appearance",
+        "module": "/api/plugins/darkmode/ui/index.js?v=2",
+        "title": "外观"
+      }
+    }
+  ]
+}

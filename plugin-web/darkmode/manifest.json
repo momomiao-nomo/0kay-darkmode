@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "name": "@razuresoft/0kay-web-darkmode",
+  "version": "0.1.0",
+  "description": "Dark mode / 暗夜模式 for the 0KAY WebUI (UI patch + native ESM page).",
+  "install": [
+    [
+      "npm",
+      "ci"
+    ],
+    [
+      "npm",
+      "run",
+      "build"
+    ]
+  ]
+}
